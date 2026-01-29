@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>視覺小說劇本編輯器 - 自動儲存版</title>
+    <style>
+        :root {
+            --bg-body: #0f172a; --panel-bg: #1e293b; --accent: #38bdf8;
+            --border: #334155; --text-p: #94a3b8; --text-h: #f1f5f9;
+            --main-path: #f43f5e; --side-path: #10b981; --warning: #fbbf24;
+        }
+        * { box-sizing: border-box; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; }
+        body { margin: 0; background: var(--bg-body); color: var(--text-h); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        #top-dashboard { height: 60px; background: #020617; border-bottom: 2px solid var(--accent); display: flex; align-items: center; padding: 0 20px; gap: 20px; z-index: 20; }
+        .stat-group { display: flex; flex-direction: column; }
+        .stat-val { font-size: 16px; font-weight: 800; color: var(--accent); }
+        .stat-lbl { font-size: 9px; color: var(--text-p); text-transform: uppercase; }
+
+        .layout-main { display: flex; flex: 1; overflow: hidden; }
+
+        #sidebar { width: 320px; background: #111827; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+        .nav-section { border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .nav-header { padding: 15px; background: #1e293b; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; color: var(--accent); position: sticky; top: 0; z-index: 10; }
+        
+        .nav-card { background: #1e293b; border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin: 8px 12px; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .nav-card.active { border-left: 5px solid var(--accent); background: #334155; }
+        .reorder-btns { display: flex; flex-direction: column; gap: 2px; opacity: 0.3; }
+        .nav-card:hover .reorder-btns { opacity: 1; }
+        .reorder-btns button { background: #0f172a; color: white; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 4px; }
+
+        #editor-pane { flex: 1; overflow-y: auto; padding: 40px; background: #0f172a; padding-bottom: 120px; }
+        .editor-container { max-width: 1000px; margin: 0 auto; display: none; }
+        .config-block { background: var(--panel-bg); border-radius: 12px; padding: 25px; margin-bottom: 25px; border: 1px solid var(--border); }
+        .block-title { font-size: 16px; font-weight: bold; color: var(--accent); margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+        .grid-matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 15px; }
+        label { display: block; font-size: 11px; color: var(--text-p); margin-bottom: 8px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; font-size: 14px; outline: none; }
+        
+        .char-presence-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+        .char-chip { padding: 6px 15px; background: #0f172a; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; cursor: pointer; }
+        .char-chip.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.1); color: var(--accent); }
+
+        .block-nav { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        .block-tab { padding: 8px 16px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        .block-tab.active { background: var(--accent); color: #020617; font-weight: bold; }
+
+        .script-row { display: flex; gap: 10px; margin-bottom: 12px; padding: 12px; background: #0f172a; border-radius: 8px; }
+        .dialogue-text { flex: 1; height: 60px; }
+        .choice-row { background: rgba(56, 189, 248, 0.05); border: 1px dashed var(--accent); display: flex; gap: 10px; padding: 15px; border-radius: 8px; margin-bottom: 12px; align-items: center; }
+        
+        /* 功能按鈕 */
+        .btn-group { display: flex; gap: 10px; margin-left: auto; }
+        .btn-export { background: var(--side-path); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-backup { background: #475569; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .btn-danger { color: var(--main-path); background: transparent; border: 1px solid var(--main-path); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+
+        .editor-footer { position: fixed; bottom: 0; right: 0; width: calc(100% - 320px); background: #020617; border-top: 1px solid var(--border); padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .btn-nav { background: #1e293b; color: white; border: 1px solid var(--border); padding: 10px 25px; border-radius: 6px; cursor: pointer; }
+        .save-tag { font-size: 10px; color: var(--side-path); margin-left: 10px; opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<div id="top-dashboard">
+    <div class="stat-group"><span class="stat-lbl">事件</span><span class="stat-val" id="node-count">0</span></div>
+    <div class="stat-group"><span class="stat-lbl">角色</span><span class="stat-val" id="char-count">0</span></div>
+    <div id="auto-save-status" class="save-tag">已自動存檔</div>
+    <div class="btn-group">
+        <button class="btn-backup" onclick="app.backupData()">💾 備份數據庫</button>
+        <button class="btn-backup" onclick="app.restoreData()">📂 還原備份</button>
+        <button class="btn-export" onclick="app.exportScript()">📤 導出劇本</button>
+    </div>
+</div>
+
+<div class="layout-main">
+    <div id="sidebar">
+        <div class="nav-section"><div class="nav-header">人物庫 <button onclick="app.add('chars')">+</button></div><div id="list-chars"></div></div>
+        <div class="nav-section"><div class="nav-header">地點庫 <button onclick="app.add('locs')">+</button></div><div id="list-locs"></div></div>
+        <div class="nav-section"><div class="nav-header">劇情流 <button onclick="app.add('events')">+</button></div><div id="list-events"></div></div>
+        <div style="margin: 20px; text-align: center;">
+            <button class="btn-danger" onclick="app.clearAllData()">⚠️ 重置所有數據</button>
+        </div>
+    </div>
+
+    <div id="editor-pane">
+        <div id="empty-state" style="text-align:center; margin-top:150px; color:var(--text-p)"><h2>歡迎回來！請選擇左側內容開始編輯</h2></div>
+
+        <div id="editor-event" class="editor-container">
+            <div class="config-block">
+                <div class="block-title">核心屬性</div>
+                <div class="grid-matrix">
+                    <div><label>事件標題</label><input type="text" id="ev-title" oninput="app.updateActive('title', this.value)"></div>
+                    <div><label>線路</label><select id="ev-route-sel" onchange="app.updateActive('route', this.value)"><option value="共通線">共通線</option><option value="個人線">個人線</option></select></div>
+                    <div><label>性質</label><select id="ev-type-sel" onchange="app.updateActive('type', this.value)"><option value="普通事件">普通事件</option><option value="好感事件">好感事件</option><option value="結局">結局</option></select></div>
+                    <div><label>日期</label><select id="ev-time-sel" onchange="app.updateActive('time', this.value)"><option value="">無</option><option value="週一">週一</option><option value="週二">週二</option><option value="週三">週三</option><option value="週四">週四</option><option value="週五">週五</option><option value="週六">週六</option><option value="週日">週日</option></select></div>
+                    <div><label>地點</label><select id="ev-loc-sel" onchange="app.updateActive('loc', this.value)"></select></div>
+                    <div><label>前置</label><select id="ev-prev-sel" onchange="app.updateActive('prev', this.value)"></select></div>
+                </div>
+            </div>
+            <div class="config-block">
+                <div class="block-title">登場角色</div>
+                <div id="char-presence-list" class="char-presence-grid"></div>
+            </div>
+            <div class="config-block">
+                <div class="block-title">對話編輯 <button class="btn-ghost" style="padding:4px 10px; border:1px solid var(--accent); color:var(--accent); background:transparent; border-radius:4px; cursor:pointer;" onclick="app.addBlock()">+ 新分支塊</button></div>
+                <div id="block-tabs" class="block-nav"></div>
+                <div id="script-list"></div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn-nav" style="flex:1" onclick="app.addLine('dia')">+ 插入對話</button>
+                    <button class="btn-nav" style="flex:1; border-color:var(--side-path); color:var(--side-path)" onclick="app.addLine('choice')">+ 插入選項跳轉</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="editor-char" class="editor-container">
+            <div class="config-block"><div class="block-title">角色設定</div><label>姓名</label><input type="text" id="char-name" oninput="app.updateActive('name', this.value)"></div>
+        </div>
+        <div id="editor-loc" class="editor-container">
+            <div class="config-block"><div class="block-title">地點設定</div><label>名稱</label><input type="text" id="loc-name" oninput="app.updateActive('name', this.value)"></div>
+        </div>
+    </div>
+
+    <div class="editor-footer" id="editor-nav" style="display:none">
+        <button class="btn-nav" onclick="app.navigate(-1)">← 上一章</button>
+        <div id="nav-info"></div>
+        <button class="btn-nav" onclick="app.navigate(1)">下一章 →</button>
+    </div>
+</div>
+
+<script>
+const app = {
+    active: { type: null, id: null, blockIdx: 0 },
+    db: {
+        chars: { "c1": {name: "旁白"}, "c2": {name: "主角"} },
+        locs: { "l1": {name: "辦公室"} },
+        events: [
+            { id: "e1", title: "序章", route: "共通線", type: "普通事件", time: "週一", loc: "辦公室", prev: "", presentChars: ["c1", "c2"], blocks: [{ name: "開始", lines: [{type: "dia", w: "旁白", t: "故事由此展開..."}] }] }
+        ]
+    },
+
+    init() {
+        this.loadFromStorage();
+        this.renderAllLists();
+    },
+
+    // 💾 儲存與載入邏輯
+    saveToStorage() {
+        localStorage.setItem('vn_editor_data', JSON.stringify(this.db));
+        const status = document.getElementById('auto-save-status');
+        status.innerText = "已自動存檔 " + new Date().toLocaleTimeString();
+        status.style.color = "var(--side-path)";
+    },
+    loadFromStorage() {
+        const saved = localStorage.getItem('vn_editor_data');
+        if (saved) {
+            try {
+                this.db = JSON.parse(saved);
+                console.log("數據載入成功");
+            } catch (e) { console.error("載入失敗", e); }
+        }
+    },
+
+    // 📥 備份功能
+    backupData() {
+        const dataStr = JSON.stringify(this.db, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `劇本備份_${new Date().toLocaleDateString()}.json`;
+        link.click();
+    },
+    restoreData() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = event => {
+                if (confirm("還原備份將會覆蓋目前的內容，確定嗎？")) {
+                    this.db = JSON.parse(event.target.result);
+                    this.saveToStorage();
+                    location.reload();
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    },
+    clearAllData() {
+        if (confirm("確定要刪除所有數據嗎？這無法還原！")) {
+            localStorage.removeItem('vn_editor_data');
+            location.reload();
+        }
+    },
+
+    // 核心操作
+    add(type) {
+        const id = type[0] + Date.now();
+        if(type === 'chars') this.db.chars[id] = {name: "新角色"};
+        else if(type === 'locs') this.db.locs[id] = {name: "新地點"};
+        else this.db.events.push({ id, title: "新事件", route: "共通線", type: "普通事件", time: "", loc: "", prev: "", presentChars: ["c1"], blocks: [{name: "開始", lines: []}]});
+        this.saveToStorage(); this.renderAllLists(); this.open(type, id);
+    },
+    open(type, id) {
+        this.active = { type, id, blockIdx: 0 };
+        document.getElementById('empty-state').style.display = 'none';
+        document.querySelectorAll('.editor-container').forEach(el => el.style.display = 'none');
+        document.getElementById('editor-nav').style.display = (type === 'events') ? 'flex' : 'none';
+        if(type === 'events') {
+            const data = this.db.events.find(e => e.id === id);
+            document.getElementById('editor-event').style.display = 'block';
+            document.getElementById('ev-title').value = data.title;
+            document.getElementById('ev-route-sel').value = data.route;
+            document.getElementById('ev-type-sel').value = data.type;
+            document.getElementById('ev-time-sel').value = data.time;
+            document.getElementById('ev-loc-sel').innerHTML = Object.values(this.db.locs).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+            document.getElementById('ev-loc-sel').value = data.loc;
+            const eventOpts = '<option value="">(無)</option>' + this.db.events.map(e => `<option value="${e.title}">${e.title}</option>`).join('');
+            document.getElementById('ev-prev-sel').innerHTML = eventOpts;
+            document.getElementById('ev-prev-sel').value = data.prev;
+            this.renderPresence(); this.renderBlocks();
+            document.getElementById('nav-info').innerText = data.title;
+        } else if(type === 'chars') {
+            document.getElementById('editor-char').style.display = 'block';
+            document.getElementById('char-name').value = this.db.chars[id].name;
+        } else if(type === 'locs') {
+            document.getElementById('editor-loc').style.display = 'block';
+            document.getElementById('loc-name').value = this.db.locs[id].name;
+        }
+        this.renderAllLists();
+    },
+    updateActive(f, v) { 
+        if(this.active.type === 'events') this.db.events.find(e => e.id === this.active.id)[f] = v;
+        else this.db[this.active.type][this.active.id][f] = v;
+        this.saveToStorage(); this.renderAllLists(); 
+    },
+    moveEvent(id, direction, e) {
+        e.stopPropagation();
+        const idx = this.db.events.findIndex(ev => ev.id === id);
+        if (direction === -1 && idx > 0) [this.db.events[idx], this.db.events[idx - 1]] = [this.db.events[idx - 1], this.db.events[idx]];
+        else if (direction === 1 && idx < this.db.events.length - 1) [this.db.events[idx], this.db.events[idx + 1]] = [this.db.events[idx + 1], this.db.events[idx]];
+        this.saveToStorage(); this.renderAllLists();
+    },
+    renderPresence() {
+        const ev = this.db.events.find(e => e.id === this.active.id);
+        document.getElementById('char-presence-list').innerHTML = Object.entries(this.db.chars).map(([cid, c]) => `
+            <div class="char-chip ${ev.presentChars.includes(cid) ? 'active' : ''}" onclick="app.togglePresence('${cid}')">${c.name}</div>
+        `).join('');
+    },
+    togglePresence(cid) {
+        const ev = this.db.events.find(e => e.id === this.active.id);
+        const idx = ev.presentChars.indexOf(cid);
+        if(idx > -1) { if(this.db.chars[cid].name !== "旁白") ev.presentChars.splice(idx, 1); }
+        else ev.presentChars.push(cid);
+        this.saveToStorage(); this.renderPresence(); this.renderLines();
+    },
+    renderBlocks() {
+        const ev = this.db.events.find(e => e.id === this.active.id);
+        document.getElementById('block-tabs').innerHTML = ev.blocks.map((b, i) => `
+            <div class="block-tab ${this.active.blockIdx === i ? 'active' : ''}" onclick="app.switchBlock(${i})">${i===0?'🚩 ':''}${b.name}</div>
+        `).join('');
+        this.renderLines();
+    },
+    switchBlock(i) { this.active.blockIdx = i; this.renderBlocks(); },
+    addBlock() { 
+        const name = prompt("分支塊名稱？"); 
+        if(name){ 
+            const ev = this.db.events.find(e => e.id === this.active.id);
+            ev.blocks.push({name, lines: []}); 
+            this.active.blockIdx = ev.blocks.length-1; 
+            this.saveToStorage(); this.renderBlocks(); 
+        }
+    },
+    renderLines() {
+        const list = document.getElementById('script-list'); list.innerHTML = '';
+        const ev = this.db.events.find(e => e.id === this.active.id);
+        const block = ev.blocks[this.active.blockIdx];
+        const available = ev.presentChars.map(cid => this.db.chars[cid]);
+        block.lines.forEach((line, i) => {
+            const row = document.createElement('div');
+            if(line.type === 'dia') {
+                row.className = 'script-row';
+                let opts = available.map(c => `<option value="${c.name}" ${line.w===c.name?'selected':''}>${c.name}</option>`).join('');
+                row.innerHTML = `<select class="char-sel" style="width:100px" onchange="app.updateLine(${i}, 'w', this.value)">${opts}</select>
+                    <textarea class="dialogue-text" oninput="app.updateLine(${i}, 't', this.value)">${line.t}</textarea>
+                    <button onclick="app.delLine(${i})" style="color:var(--main-path); border:none; background:none; cursor:pointer">×</button>`;
+            } else {
+                row.className = 'choice-row';
+                let targetOpts = ev.blocks.map((b, bi) => `<option value="${bi}" ${line.target==bi?'selected':''}>跳轉: ${b.name}</option>`).join('');
+                row.innerHTML = `<div style="color:var(--accent); font-weight:bold; font-size:11px; width:40px;">選項</div>
+                    <input type="text" value="${line.t}" oninput="app.updateLine(${i}, 't', this.value)">
+                    <select onchange="app.updateLine(${i}, 'target', this.value)">${targetOpts}</select>
+                    <button onclick="app.delLine(${i})" style="color:var(--main-path); border:none; background:none; cursor:pointer">×</button>`;
+            }
+            list.appendChild(row);
+        });
+    },
+    addLine(type) {
+        const ev = this.db.events.find(e => e.id === this.active.id);
+        const block = ev.blocks[this.active.blockIdx];
+        if(type === 'dia') block.lines.push({type: 'dia', w: this.db.chars[ev.presentChars[0]]?.name || "旁白", t: ""});
+        else block.lines.push({type: 'choice', t: "新的選項", target: 0});
+        this.saveToStorage(); this.renderLines();
+    },
+    updateLine(i, f, v) { 
+        this.db.events.find(e => e.id === this.active.id).blocks[this.active.blockIdx].lines[i][f] = v; 
+        this.saveToStorage();
+    },
+    delLine(i) { 
+        this.db.events.find(e => e.id === this.active.id).blocks[this.active.blockIdx].lines.splice(i,1); 
+        this.saveToStorage(); this.renderLines(); 
+    },
+    renderAllLists() {
+        document.getElementById('list-chars').innerHTML = Object.entries(this.db.chars).map(([id, item]) => `<div class="nav-card ${this.active.id===id?'active':''}" onclick="app.open('chars','${id}')">${item.name}</div>`).join('');
+        document.getElementById('list-locs').innerHTML = Object.entries(this.db.locs).map(([id, item]) => `<div class="nav-card ${this.active.id===id?'active':''}" onclick="app.open('locs','${id}')">${item.name}</div>`).join('');
+        document.getElementById('list-events').innerHTML = this.db.events.map((item, idx) => `
+            <div class="nav-card ${this.active.id === item.id ? 'active' : ''}" onclick="app.open('events', '${item.id}')">
+                <div style="flex:1"><b>${item.title}</b></div>
+                <div class="reorder-btns">
+                    <button onclick="app.moveEvent('${item.id}', -1, event)">▲</button>
+                    <button onclick="app.moveEvent('${item.id}', 1, event)">▼</button>
+                </div>
+            </div>`).join('');
+        document.getElementById('node-count').innerText = this.db.events.length;
+        document.getElementById('char-count').innerText = Object.keys(this.db.chars).length;
+    },
+    navigate(dir) {
+        const idx = this.db.events.findIndex(e => e.id === this.active.id);
+        const newIdx = idx + dir;
+        if(newIdx >= 0 && newIdx < this.db.events.length) this.open('events', this.db.events[newIdx].id);
+    },
+    exportScript() {
+        let html = `<html><head><title>劇本導出</title><style>body { font-family: sans-serif; max-width: 800px; margin: 40px auto; line-height: 1.6; color: #333; } .event-box { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 40px; page-break-after: always; } .meta { color: #666; font-size: 0.9em; margin-bottom: 20px; } .block-header { background: #f0f0f0; padding: 5px 10px; margin-top: 20px; font-weight: bold; border-left: 4px solid #38bdf8; } .dia-line { margin-bottom: 10px; display: flex; } .name { width: 100px; font-weight: bold; flex-shrink: 0; } .text { flex: 1; } .choice-box { background: #e0f2fe; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px dashed #38bdf8; }</style></head><body>`;
+        this.db.events.forEach(ev => {
+            html += `<div class="event-box"><h1>${ev.title}</h1><div class="meta">線路：${ev.route} | 地點：${ev.loc}</div>`;
+            ev.blocks.forEach(block => {
+                html += `<div class="block-header">區塊：${block.name}</div>`;
+                block.lines.forEach(line => {
+                    if(line.type === 'dia') html += `<div class="dia-line"><div class="name">${line.w}</div><div class="text">${line.t.replace(/\n/g, '<br>')}</div></div>`;
+                    else html += `<div class="choice-box"><b>選項：</b> ${line.t} ➔ <i>跳轉至 ${ev.blocks[line.target]?.name}</i></div>`;
+                });
+            });
+            html += `</div>`;
+        });
+        const win = window.open('', '_blank'); win.document.write(html); win.document.close();
+    }
+};
+app.init();
+</script>
+</body>
+</html>
